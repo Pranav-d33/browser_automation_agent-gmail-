@@ -1,0 +1,19 @@
+# .gitignore
+.env
+# Python
+__pycache__/
+*.pyc
+.env
+venv/
+.idea/
+
+# Node
+node_modules/
+dist/
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Project Specific
+user_data/
