@@ -20,30 +20,6 @@ This solution **does not** use any of the following shortcuts:
 
 The entire email-sending process is performed by interacting with the live Gmail web interface, proving the agent's capability to control a browser for complex, real-world tasks.
 
-## Architecture Diagram
-
-The system is built on a decoupled frontend-backend architecture, ensuring clear separation of concerns and future extensibility.
-
-
-+-----------------+      +----------------------+      +------------------------+
-|                 |      |                      |      |                        |
-|  React Frontend |      |     FastAPI Backend  |      |   Browser Controller   |
-|    (App.jsx)    |      |      (main.py)       |      | (browser_controller.py)|
-|                 |      |                      |      |      (Playwright)      |
-+-------+---------+      +----------+-----------+      +------------+-----------+
-| WebSocket (ws)     ^      |     ^                      |
-+--------------------+      |     | (Subprocess Call)    |
-|     |                      |
-|     +----------------------+
-|
-v
-+---------+------------+
-|                      |
-|     LLM Service      |
-|   (llm_service.py)   |
-|      (Gemini)        |
-+----------------------+
-
 
 ## Technology Choices and Justifications
 
