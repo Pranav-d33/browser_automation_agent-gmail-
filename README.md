@@ -4,19 +4,19 @@ This project is a sophisticated AI agent that controls a web browser through a n
 The user experience is modeled after advanced agentic systems like Proxy Convergence AI, where browser actions are visualized through screenshots embedded directly within the chat flow.
 
 Core Principle: True Browser Automation
-A critical requirement of this project is to demonstrate genuine browser automation, not API integration.
+This is a browser automation project, not an API integration project.
 
-This agent controls a real browser instance using Playwright. It navigates the web, clicks UI elements, and types into forms just as a human would.
+The agent's primary function is to control a real browser instance using Playwright. It navigates the web, clicks UI elements, and types into forms just as a human would.
 
-It does not use any of the following shortcuts:
+This solution does not use any of the following shortcuts:
 
 ❌ No Gmail API
 
-❌ No SMTP libraries
+❌ No SMTP libraries (import smtplib)
 
 ❌ No programmatic form submissions via HTTP requests
 
-The entire email-sending process is performed by interacting with the live Gmail web interface, proving the agent's capability to control a browser for complex tasks.
+The entire email-sending process is performed by interacting with the live Gmail web interface, proving the agent's capability to control a browser for complex, real-world tasks.
 
 Architecture Diagram
 The system is built on a decoupled frontend-backend architecture, ensuring clear separation of concerns and future extensibility.
@@ -24,17 +24,13 @@ The system is built on a decoupled frontend-backend architecture, ensuring clear
 +-----------------+      +----------------------+      +------------------------+
 |                 |      |                      |      |                        |
 |  React Frontend |      |     FastAPI Backend  |      |   Browser Controller   |
-| (App.jsx)       |      |      (main.py)       |      | (browser_controller.py)|
+|    (App.jsx)    |      |      (main.py)       |      | (browser_controller.py)|
 |                 |      |                      |      |      (Playwright)      |
 +-------+---------+      +----------+-----------+      +------------+-----------+
-        |                    ^      |     ^                      |
-        | WebSocket (ws)     |      |     | (Subprocess Call)    |
-        v                    |      |     |                      |
-+-------+---------+          |      |     +----------------------+
-|                 |          |      |
-| User Interface  |----------+      |
-| (Chat & Images) |                 |
-+-----------------+                 |
+        | WebSocket (ws)     ^      |     ^                      |
+        +--------------------+      |     | (Subprocess Call)    |
+                                    |     |                      |
+                                    |     +----------------------+
                                     |
                                     v
                           +---------+------------+
@@ -44,25 +40,25 @@ The system is built on a decoupled frontend-backend architecture, ensuring clear
                           |      (Gemini)        |
                           +----------------------+
 
-Technology Stack
-Backend: Python, FastAPI, Uvicorn
+Technology Choices and Justifications
+Backend: Python 3.11 with FastAPI was chosen for its high performance, modern asynchronous capabilities, and ease of creating robust APIs. Uvicorn serves as the ASGI server.
 
-Browser Automation: Playwright
+Browser Automation: Playwright was selected for its modern, robust, and reliable API for controlling browsers. It offers powerful features like auto-waits that make scripts less flaky than older tools.
 
-AI & Natural Language: Google Gemini API
+AI & Natural Language: The Google Gemini API (gemini-1.5-flash) is used for its strong natural language understanding and generation capabilities, which are essential for the conversational aspect of the agent.
 
-Frontend: React (Vite), Tailwind CSS
+Frontend: React (Vite) provides a fast, modern, and component-based framework for building a dynamic and responsive user interface. Tailwind CSS is used for rapid and clean styling.
 
-Real-time Communication: WebSockets
+Real-time Communication: WebSockets are used to maintain a persistent, bidirectional connection between the frontend and backend, allowing for the real-time streaming of status updates and screenshots.
 
 How It Works
 The agent follows a stateful, sequential process to interact with the user and control the browser.
 
-Initiation: The user connects to the frontend, which establishes a WebSocket connection with the FastAPI backend.
+Initiation: The user connects to the React frontend, which establishes a WebSocket connection with the FastAPI backend.
 
-Conversation & NLU: The agent asks for the user's name and the purpose of the email. The llm_service.py module, powered by the Gemini API, extracts key details (recipient, subject, primary_reason) from the user's natural language responses.
+Conversation & NLU: The agent begins a conversation to gather the necessary details for the email task (user's name, primary reason, recipient, subject). The llm_service.py module, powered by the Gemini API, extracts key details from the user's natural language responses.
 
-AI Content Generation: Once all necessary information is gathered, the agent uses the Gemini API (generate_email_body function) to create a professional email body based on the conversation's context.
+AI Content Generation: Once all information is gathered, the agent uses the Gemini API (generate_email_body function) to create a professional email body based on the conversation's context.
 
 Browser Automation Trigger: The backend (main.py) calls the browser_controller.py script as a separate process, passing the recipient, subject, and generated body as arguments.
 
@@ -149,6 +145,11 @@ npm run dev
 
 The frontend will be accessible at http://localhost:5173 (or another port if 5173 is in use). Open this URL in your browser to start interacting with the agent.
 
+Agent in Action
+(Here you can add a GIF or screenshots of the final application)
+
+Example Screenshot:
+
 Challenges Faced & Solutions
 asyncio Event Loop on Windows:
 
@@ -166,7 +167,4 @@ CORS Errors:
 
 Problem: The frontend was initially blocked from connecting to the backend due to Cross-Origin Resource Sharing (CORS) policies.
 
-Solution: For development, the FastAPI backend was configured to allow all origins (origins = ["*"]). This ensures a smooth development experience. For production, this would be locked down to the specific frontend domain.
-
-Agent in Action
-[Screenshot of the chat interface with embedded browser images]
+Solution: For development, the FastAPI backend was configured to allow all origins (origins = ["*"]). This ensures a smooth development experience. For production, this would
