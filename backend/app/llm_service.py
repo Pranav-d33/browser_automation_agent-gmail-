@@ -15,17 +15,18 @@ genai.configure(api_key=api_key)
 
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-def extract_specific_detail(user_message: str, detail_name: str) -> dict:
-    # This function remains the same and is still very useful.
+def classify_intent(user_message: str) -> str:
+    """
+    Classifies the user's intent as either 'email_task' or 'general_chat'.
+    """
     prompt = f"""
-    You are an expert data extractor. The user was asked for the email's "{detail_name}".
-    From the user's response below, extract the value for the "{detail_name}".
-    Your entire response must be a simple JSON object containing ONLY the key you found.
-    For example: {{"{detail_name}": "the extracted value"}}
-    Do not add any other text, explanations, or markdown formatting.
+    Analyze the user's message and classify its primary intent.
+    Respond with only one of two possible JSON values: {{"intent": "email_task"}} or {{"intent": "general_chat"}}.
 
-    **User's response:**
-    "{user_message}"
+    - If the user mentions sending, composing, or anything related to an email, classify it as "email_task".
+    - For any other type of message (like greetings, questions, or casual conversation), classify it as "general_chat".
+
+    User's message: "{user_message}"
     """
     try:
         response = model.generate_content(prompt)
@@ -33,19 +34,40 @@ def extract_specific_detail(user_message: str, detail_name: str) -> dict:
         match = re.search(r"\{.*\}", response_text, re.DOTALL)
         if match:
             json_block = match.group(0)
-            return json.loads(json_block.strip())
-        else:
-            return {}
+            data = json.loads(json_block.strip())
+            return data.get("intent", "general_chat")
+        return "general_chat"
     except Exception as e:
-        print(f"Error extracting '{detail_name}' with Gemini: {e}")
-        return {}
+        print(f"Error classifying intent: {e}")
+        return "general_chat"
+
+def generate_chat_response(user_message: str, user_name: str = None) -> str:
+    """
+    Generates a conversational response for general chat.
+    """
+    name_context = f"The user's name is {user_name}." if user_name else "You don't know the user's name yet."
+    
+    prompt = f"""
+    You are a friendly and helpful conversational AI. 
+    {name_context}
+    The user just said: "{user_message}"
+    
+    Provide a brief, natural, and conversational response. Do not offer to perform tasks unless asked.
+    """
+    try:
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        print(f"Error generating chat response: {e}")
+        return "I'm not sure how to respond to that, but I'm here to help!"
+
+# --- The other functions remain for when the agent is in "email_task" mode ---
 
 def generate_email_body(details: EmailDetails) -> dict:
     """
     Generates a subject and body for the email using the Gemini API.
     Returns a dictionary with 'subject' and 'body'.
     """
-    # --- MODIFIED: More detailed prompt for better content generation ---
     prompt = f"""
     You are a professional assistant writing a concise and clear email.
     The user's name is: {details.user_name}
@@ -69,7 +91,6 @@ def generate_email_body(details: EmailDetails) -> dict:
             json_block = match.group(0)
             return json.loads(json_block.strip())
         else:
-            # Fallback if JSON is not returned correctly
             return {"subject": details.subject, "body": details.context_details}
     except Exception as e:
         print(f"Error generating email body with Gemini: {e}")

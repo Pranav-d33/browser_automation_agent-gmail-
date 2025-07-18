@@ -10,7 +10,8 @@ import base64
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from .llm_service import extract_specific_detail, generate_email_body
+# --- MODIFIED: Import the new AI functions ---
+from .llm_service import classify_intent, generate_chat_response, generate_email_body
 from .agent_logic import EmailDetails
 
 logging.basicConfig(level=logging.INFO)
@@ -20,8 +21,8 @@ app = FastAPI(title="Conversational Browser Agent Backend")
 origins = ["*"]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# --- MODIFIED: Function now accepts user credentials ---
 def run_browser_automation(user_email: str, user_password: str, recipient: str, subject: str, body: str) -> str:
+    # This function remains unchanged
     command = [sys.executable, "-u", "app/browser_controller.py", user_email, user_password, recipient, subject, body]
     result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8')
     if result.returncode != 0:
@@ -46,31 +47,42 @@ async def websocket_endpoint(websocket: WebSocket):
             user_message = await websocket.receive_text()
             logger.info(f"Received message: {user_message}")
 
-            # --- NEW CONVERSATION FLOW ---
-            if not conversation_state.user_name:
-                conversation_state.user_name = user_message.strip()
-                await send_json_message(websocket, "status", f"Nice to meet you, {conversation_state.user_name}! What is this email about?")
+            # --- NEW INTENT-DRIVEN CONVERSATION FLOW ---
+
+            # First, check if we are in the middle of a task.
+            # The presence of `primary_reason` indicates we are in the email workflow.
+            if conversation_state.primary_reason:
+                # --- TASK EXECUTION MODE ---
+                if not conversation_state.user_email:
+                    conversation_state.user_email = user_message.strip()
+                    await send_json_message(websocket, "status", "Thanks! And what's the password for this account?")
+                
+                elif not conversation_state.user_password:
+                    conversation_state.user_password = user_message.strip()
+                    await send_json_message(websocket, "status", "Great. Are there any other specific details to include, like dates?")
+
+                elif not conversation_state.context_details:
+                    conversation_state.context_details = user_message.strip()
+                    await send_json_message(websocket, "status", "Got it. And finally, what's the recipient's email address?")
+
+                elif not conversation_state.recipient_email:
+                    conversation_state.recipient_email = user_message.strip()
             
-            elif not conversation_state.primary_reason:
-                conversation_state.primary_reason = user_message.strip()
-                await send_json_message(websocket, "status", "I can help with that. To access your email, I'll need your Gmail address.")
-            
-            elif not conversation_state.user_email:
-                conversation_state.user_email = user_message.strip()
-                await send_json_message(websocket, "status", "Thanks! And what's the password for this account?")
+            else:
+                # --- NEUTRAL CONVERSATION MODE ---
+                if not conversation_state.user_name:
+                    conversation_state.user_name = user_message.strip()
+                    await send_json_message(websocket, "status", f"Nice to meet you, {conversation_state.user_name}! How can I help you today?")
+                else:
+                    intent = classify_intent(user_message)
+                    if intent == "email_task":
+                        conversation_state.primary_reason = user_message.strip()
+                        await send_json_message(websocket, "status", "I can help with that. To access your email, I'll need your Gmail address.")
+                    else: # general_chat
+                        chat_response = generate_chat_response(user_message, conversation_state.user_name)
+                        await send_json_message(websocket, "status", chat_response)
 
-            elif not conversation_state.user_password:
-                conversation_state.user_password = user_message.strip()
-                await send_json_message(websocket, "status", "Great. Are there any other specific details to include, like dates?")
-
-            elif not conversation_state.context_details:
-                conversation_state.context_details = user_message.strip()
-                await send_json_message(websocket, "status", "Got it. And finally, what's the recipient's email address?")
-
-            elif not conversation_state.recipient_email:
-                conversation_state.recipient_email = user_message.strip()
-
-            # --- CHECK IF READY FOR AUTOMATION ---
+            # --- CHECK IF READY FOR AUTOMATION (This runs after every message) ---
             if conversation_state.is_ready_for_automation():
                 await send_json_message(websocket, "status", "Perfect! I have all the details. I'll now open Gmail and send the email.")
                 
@@ -79,6 +91,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 email_body = email_content.get("body", conversation_state.context_details)
                 
                 try:
+                    # (The browser automation and screenshot logic remains exactly the same)
                     browser_output = await asyncio.to_thread(
                         run_browser_automation,
                         conversation_state.user_email,
@@ -103,8 +116,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
                     await send_json_message(websocket, "status", f"✅ Email sent successfully to {conversation_state.recipient_email}!")
                     
-                    conversation_state = EmailDetails() # Reset for the next task
-                    await send_json_message(websocket, "status", "What can I do for you next?")
+                    # Reset state but keep the user's name for the next conversation
+                    user_name = conversation_state.user_name
+                    conversation_state = EmailDetails(user_name=user_name)
+                    await send_json_message(websocket, "status", f"What else can I do for you, {user_name}?")
                 
                 except Exception as e:
                     logger.error("Error during browser automation:")
@@ -116,8 +131,3 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.error(f"Error in WebSocket: {e}")
         traceback.print_exc()
-
-# You can add the uvicorn runner back here if you need it for Windows
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
